@@ -1,12 +1,12 @@
 class Customer {
-  int? customerId; // Opcional, porque al crear todavía no existe
+  int customerId; // Ahora es obligatorio
   String name;
   String phone;
   String email;
   String status; // "A" activo, "I" inactivo, etc.
 
   Customer({
-    this.customerId,
+    required this.customerId,
     required this.name,
     required this.phone,
     required this.email,
