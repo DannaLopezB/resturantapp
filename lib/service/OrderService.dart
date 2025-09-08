@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 
-import '../model/order.dart'; // Aquí ya están tus DTOs definidos en este mismo archivo
+import '../models/order.dart'; // Aquí ya están tus DTOs definidos en este mismo archivo
 
 class OrderService {
-  final String baseUrl = "http://localhost:8080/api/orders";
+  final String baseUrl = "https://laughing-space-trout-9p9q95gqvrqf76jq-8088.app.github.dev/api/orders";
 
   /// Crear nueva orden
   Future<OrderResponseDTO> createOrder(OrderRequestDTO orderRequest) async {

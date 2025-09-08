@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../model/drink.dart';
+import '../models/drink.dart';
 
 class DrinkService {
-  final String baseUrl = "http://localhost:8080/api/drinks";
+  final String baseUrl = "https://laughing-space-trout-9p9q95gqvrqf76jq-8088.app.github.dev/api/drinks";
 
   Future<Drink> createDrink(Drink drink) async {
     final response = await http.post(

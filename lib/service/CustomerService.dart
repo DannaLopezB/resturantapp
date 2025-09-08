@@ -1,10 +1,10 @@
 import 'dart:convert';
-
 import 'package:http/http.dart' as http;
-import '../model/customer.dart';
+import '../models/customer.dart';
 
 class CustomerService {
-  final String baseUrl = "http://localhost:8080/api/customers";
+  final String baseUrl =
+      "https://laughing-space-trout-9p9q95gqvrqf76jq-8088.app.github.dev/api/customers";
 
   /// Crear un cliente
   Future<Customer> create(Customer customer) async {

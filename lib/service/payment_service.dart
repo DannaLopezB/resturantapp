@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../model/payment.dart';
+import '../models/payment.dart';
 
 class PaymentService {
-  final String baseUrl = "http://localhost:8080/api/payments";
+  final String baseUrl = "https://laughing-space-trout-9p9q95gqvrqf76jq-8088.app.github.dev/api/payments";
 
   /// Crear un pago
   Future<Payment> create(Payment payment) async {
@@ -80,9 +80,7 @@ class PaymentService {
 
   /// Buscar pagos por método de pago
   Future<List<Payment>> findByPaymentMethod(String paymentMethod) async {
-    final response = await http.get(
-      Uri.parse("$baseUrl/method/$paymentMethod"),
-    );
+    final response = await http.get(Uri.parse("$baseUrl/method/$paymentMethod"));
 
     if (response.statusCode == 200) {
       Iterable list = jsonDecode(response.body);

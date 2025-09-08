@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import '../model/employee.dart';
+import '../models/employee.dart';
 
 class EmployeeService {
-  final String baseUrl = "http://localhost:8080/api/employees";
+  final String baseUrl = "https://laughing-space-trout-9p9q95gqvrqf76jq-8088.app.github.dev/api/employees";
 
   Future<Employee> createEmployee(Employee employee) async {
     final response = await http.post(
