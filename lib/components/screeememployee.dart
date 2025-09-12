@@ -30,12 +30,20 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
       if (_currentFilter == 'A') {
         employees = await _employeeService.getAllActiveEmployees();
       } else if (_currentFilter == 'I') {
-        // Para obtener inactivos, obtenemos todos y filtramos
         final allEmployees = await _employeeService.getAllEmployees();
         employees = allEmployees.where((e) => e.status == 'I').toList();
       } else {
         employees = await _employeeService.getAllEmployees();
       }
+
+      // Debug: Verificar IDs de empleados cargados
+      print('=== EMPLEADOS CARGADOS ===');
+      for (var emp in employees) {
+        print(
+          'ID: ${emp.employeeId}, Nombre: ${emp.name} ${emp.lastname}, Estado: ${emp.status}',
+        );
+      }
+      print('========================');
 
       setState(() {
         _employees = employees;
@@ -71,6 +79,9 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
 
   void _showEmployeeDialog({Employee? employee}) {
     final nameController = TextEditingController(text: employee?.name ?? '');
+    final lastnameController = TextEditingController(
+      text: employee?.lastname ?? '',
+    );
     final roleController = TextEditingController(text: employee?.role ?? '');
     final phoneController = TextEditingController(text: employee?.phone ?? '');
     final formKey = GlobalKey<FormState>();
@@ -93,6 +104,15 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
         ? employee?.role
         : null;
 
+    // CORRECIÓN: Si el empleado tiene un rol que no está en la lista predefinida,
+    // configurar como 'custom' y establecer el texto en el controller
+    if (employee != null &&
+        employee.role.isNotEmpty &&
+        !predefinedRoles.contains(employee.role)) {
+      selectedRole = 'custom';
+      roleController.text = employee.role;
+    }
+
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -104,16 +124,69 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  // Mostrar ID del empleado si está editando
+                  if (employee != null && employee.employeeId != null)
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.orange.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: Colors.orange.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.badge,
+                            color: Colors.orange,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'ID del empleado: ${employee.employeeId}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   TextFormField(
                     controller: nameController,
                     decoration: const InputDecoration(
-                      labelText: 'Nombre completo',
+                      labelText: 'Nombre',
                       border: OutlineInputBorder(),
                       prefixIcon: Icon(Icons.person),
                     ),
                     validator: (value) {
-                      if (value == null || value.isEmpty) {
+                      if (value == null || value.trim().isEmpty) {
                         return 'El nombre es requerido';
+                      }
+                      if (value.trim().length < 2) {
+                        return 'El nombre debe tener al menos 2 caracteres';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: lastnameController,
+                    decoration: const InputDecoration(
+                      labelText: 'Apellido',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.person_outline),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.trim().isEmpty) {
+                        return 'El apellido es requerido';
+                      }
+                      if (value.trim().length < 2) {
+                        return 'El apellido debe tener al menos 2 caracteres';
                       }
                       return null;
                     },
@@ -139,17 +212,18 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
                     onChanged: (value) {
                       setDialogState(() {
                         selectedRole = value;
-                        if (value != 'custom') {
-                          roleController.text = value ?? '';
-                        } else {
+                        if (value != 'custom' && value != null) {
+                          roleController.text = value;
+                        } else if (value == 'custom' &&
+                            roleController.text.isEmpty) {
+                          // Solo limpiar si está vacío, mantener el texto existente
                           roleController.text = '';
                         }
                       });
                     },
                     validator: (value) {
-                      if ((value == null || value == 'custom') &&
-                          roleController.text.isEmpty) {
-                        return 'El rol es requerido';
+                      if (value == null && roleController.text.trim().isEmpty) {
+                        return 'Debe seleccionar un rol o escribir uno personalizado';
                       }
                       return null;
                     },
@@ -165,8 +239,8 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
                       ),
                       validator: (value) {
                         if (selectedRole == 'custom' &&
-                            (value == null || value.isEmpty)) {
-                          return 'Debe especificar el rol';
+                            (value == null || value.trim().isEmpty)) {
+                          return 'Debe especificar el rol personalizado';
                         }
                         return null;
                       },
@@ -182,8 +256,11 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
                     ),
                     keyboardType: TextInputType.phone,
                     validator: (value) {
-                      if (value == null || value.isEmpty) {
+                      if (value == null || value.trim().isEmpty) {
                         return 'El teléfono es requerido';
+                      }
+                      if (value.trim().length < 8) {
+                        return 'El teléfono debe tener al menos 8 dígitos';
                       }
                       return null;
                     },
@@ -202,30 +279,65 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
               onPressed: () async {
                 if (formKey.currentState!.validate()) {
                   try {
-                    final employeeData = Employee(
-                      employeeId: employee?.employeeId,
-                      name: nameController.text,
-                      role: selectedRole == 'custom'
-                          ? roleController.text
-                          : (selectedRole ?? roleController.text),
-                      phone: phoneController.text,
-                      status: employee?.status ?? 'A',
-                    );
+                    // Obtener el rol final
+                    final finalRole = selectedRole == 'custom'
+                        ? roleController.text.trim()
+                        : (selectedRole ?? roleController.text.trim());
 
                     if (employee == null) {
-                      await _employeeService.createEmployee(employeeData);
+                      // CREAR NUEVO EMPLEADO
+                      final newEmployee = Employee(
+                        employeeId: null, // Para nuevos empleados
+                        name: nameController.text.trim(),
+                        lastname: lastnameController.text.trim(),
+                        role: finalRole,
+                        phone: phoneController.text.trim(),
+                        registerDate: null, // Se asignará en el backend
+                        status: 'A', // Nuevo empleado siempre activo
+                      );
+
+                      print('Creando nuevo empleado: $newEmployee');
+                      await _employeeService.createEmployee(newEmployee);
                       _showSuccessSnackBar('Empleado creado exitosamente');
                     } else {
+                      // ACTUALIZAR EMPLEADO EXISTENTE
+                      if (employee.employeeId == null) {
+                        throw Exception(
+                          'El empleado no tiene un ID válido para actualizar',
+                        );
+                      }
+
+                      // CORRECCIÓN: Crear empleado actualizado usando copyWith o constructor completo
+                      final updatedEmployee = Employee(
+                        employeeId:
+                            employee.employeeId!, // Mantener ID original
+                        name: nameController.text.trim(),
+                        lastname: lastnameController.text.trim(),
+                        role: finalRole,
+                        phone: phoneController.text.trim(),
+                        registerDate:
+                            employee.registerDate, // Mantener fecha original
+                        status: employee.status, // Mantener estado original
+                      );
+
+                      // Debug: Imprimir información del empleado antes de actualizar
+                      print('=== ACTUALIZANDO EMPLEADO ===');
+                      print('ID original: ${employee.employeeId}');
+                      print('Datos originales: $employee');
+                      print('Datos actualizados: $updatedEmployee');
+                      print('=============================');
+
                       await _employeeService.updateEmployee(
                         employee.employeeId!,
-                        employeeData,
+                        updatedEmployee,
                       );
                       _showSuccessSnackBar('Empleado actualizado exitosamente');
                     }
 
                     Navigator.of(context).pop();
-                    _loadEmployees();
+                    await _loadEmployees(); // Recargar lista
                   } catch (e) {
+                    print('Error en operación: $e'); // Debug
                     _showErrorDialog(
                       'Error al ${employee == null ? 'crear' : 'actualizar'} empleado: $e',
                     );
@@ -233,7 +345,7 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
                 }
               },
               child: Text(
-                employee == null ? 'Crear' : 'Guardar',
+                employee == null ? 'Crear' : 'Actualizar',
                 style: const TextStyle(color: Colors.white),
               ),
             ),
@@ -244,12 +356,40 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
   }
 
   Future<void> _deleteEmployee(Employee employee) async {
+    if (employee.employeeId == null) {
+      _showErrorDialog('Error: ID del empleado no disponible para eliminar');
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Confirmar eliminación'),
-        content: Text(
-          '¿Está seguro de eliminar al empleado "${employee.name}"?',
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('¿Está seguro de eliminar al empleado?'),
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.grey.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'ID: ${employee.employeeId}',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  Text('Nombre: ${employee.name} ${employee.lastname}'),
+                  Text('Rol: ${employee.role}'),
+                ],
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -259,7 +399,10 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Eliminar'),
+            child: const Text(
+              'Eliminar',
+              style: TextStyle(color: Colors.white),
+            ),
           ),
         ],
       ),
@@ -269,62 +412,72 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
       try {
         await _employeeService.logicalDeleteEmployee(employee.employeeId!);
         _showSuccessSnackBar('Empleado eliminado exitosamente');
-        _loadEmployees();
+        await _loadEmployees();
       } catch (e) {
+        print('Error al eliminar: $e'); // Debug
         _showErrorDialog('Error al eliminar empleado: $e');
       }
     }
   }
 
   Future<void> _restoreEmployee(Employee employee) async {
+    if (employee.employeeId == null) {
+      _showErrorDialog('Error: ID del empleado no disponible para restaurar');
+      return;
+    }
+
     try {
       await _employeeService.restoreEmployee(employee.employeeId!);
       _showSuccessSnackBar('Empleado restaurado exitosamente');
-      _loadEmployees();
+      await _loadEmployees();
     } catch (e) {
+      print('Error al restaurar: $e'); // Debug
       _showErrorDialog('Error al restaurar empleado: $e');
     }
   }
 
   Widget _buildFilterChips() {
-    return Row(
-      children: [
-        FilterChip(
-          label: const Text('Activos'),
-          selected: _currentFilter == 'A',
-          onSelected: (selected) {
-            if (selected) {
-              setState(() => _currentFilter = 'A');
-              _loadEmployees();
-            }
-          },
-          selectedColor: Colors.orange.withOpacity(0.3),
-        ),
-        const SizedBox(width: 8),
-        FilterChip(
-          label: const Text('Inactivos'),
-          selected: _currentFilter == 'I',
-          onSelected: (selected) {
-            if (selected) {
-              setState(() => _currentFilter = 'I');
-              _loadEmployees();
-            }
-          },
-          selectedColor: Colors.red.withOpacity(0.3),
-        ),
-        const SizedBox(width: 8),
-        FilterChip(
-          label: const Text('Todos'),
-          selected: _currentFilter == 'ALL',
-          onSelected: (selected) {
-            if (selected) {
-              setState(() => _currentFilter = 'ALL');
-              _loadEmployees();
-            }
-          },
-          selectedColor: Colors.blue.withOpacity(0.3),
-        ),
-      ],
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          FilterChip(
+            label: const Text('Activos'),
+            selected: _currentFilter == 'A',
+            onSelected: (selected) {
+              if (selected) {
+                setState(() => _currentFilter = 'A');
+                _loadEmployees();
+              }
+            },
+            selectedColor: Colors.orange.withOpacity(0.3),
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            label: const Text('Inactivos'),
+            selected: _currentFilter == 'I',
+            onSelected: (selected) {
+              if (selected) {
+                setState(() => _currentFilter = 'I');
+                _loadEmployees();
+              }
+            },
+            selectedColor: Colors.red.withOpacity(0.3),
+          ),
+          const SizedBox(width: 8),
+          FilterChip(
+            label: const Text('Todos'),
+            selected: _currentFilter == 'ALL',
+            onSelected: (selected) {
+              if (selected) {
+                setState(() => _currentFilter = 'ALL');
+                _loadEmployees();
+              }
+            },
+            selectedColor: Colors.blue.withOpacity(0.3),
+          ),
+        ],
+      ),
     );
   }
 
@@ -380,27 +533,64 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
     }
   }
 
+  String _getInitials(String name, String lastname) {
+    String nameInitial = name.isNotEmpty ? name[0].toUpperCase() : '';
+    String lastnameInitial = lastname.isNotEmpty
+        ? lastname[0].toUpperCase()
+        : '';
+    return '$nameInitial$lastnameInitial';
+  }
+
   Widget _buildEmployeeCard(Employee employee) {
     final isActive = employee.status == 'A';
     final roleColor = _getRoleColor(employee.role);
     final roleIcon = _getRoleIcon(employee.role);
+    final fullName = '${employee.name} ${employee.lastname}';
+    final initials = _getInitials(employee.name, employee.lastname);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: 3,
       child: ListTile(
         contentPadding: const EdgeInsets.all(16),
-        leading: Container(
-          width: 60,
-          height: 60,
-          decoration: BoxDecoration(
-            color: isActive ? roleColor : Colors.grey,
-            borderRadius: BorderRadius.circular(30),
-          ),
-          child: Icon(roleIcon, color: Colors.white, size: 30),
+        leading: Stack(
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: isActive ? roleColor : Colors.grey,
+                borderRadius: BorderRadius.circular(30),
+              ),
+              child: Center(
+                child: Text(
+                  initials,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              bottom: 0,
+              right: 0,
+              child: Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: isActive ? roleColor : Colors.grey,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white, width: 2),
+                ),
+                child: Icon(roleIcon, color: Colors.white, size: 12),
+              ),
+            ),
+          ],
         ),
         title: Text(
-          employee.name,
+          fullName,
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 18,
@@ -420,12 +610,15 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
                   color: isActive ? roleColor : Colors.grey,
                 ),
                 const SizedBox(width: 4),
-                Text(
-                  employee.role,
-                  style: TextStyle(
-                    color: isActive ? roleColor : Colors.grey,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
+                Expanded(
+                  child: Text(
+                    employee.role,
+                    style: TextStyle(
+                      color: isActive ? roleColor : Colors.grey,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
@@ -439,15 +632,38 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
                   color: isActive ? Colors.grey[600] : Colors.grey,
                 ),
                 const SizedBox(width: 4),
-                Text(
-                  employee.phone,
-                  style: TextStyle(
-                    color: isActive ? Colors.grey[700] : Colors.grey,
-                    fontSize: 14,
+                Expanded(
+                  child: Text(
+                    employee.phone,
+                    style: TextStyle(
+                      color: isActive ? Colors.grey[700] : Colors.grey,
+                      fontSize: 14,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
+            if (employee.registerDate != null) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  Icon(
+                    Icons.calendar_today,
+                    size: 16,
+                    color: isActive ? Colors.grey[600] : Colors.grey,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Registrado: ${employee.registerDate!.day}/${employee.registerDate!.month}/${employee.registerDate!.year}',
+                    style: TextStyle(
+                      color: isActive ? Colors.grey[700] : Colors.grey,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -532,6 +748,7 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadEmployees,
+            tooltip: 'Actualizar lista',
           ),
         ],
       ),
@@ -587,11 +804,14 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
                       ],
                     ),
                   )
-                : ListView.builder(
-                    itemCount: _employees.length,
-                    itemBuilder: (context, index) {
-                      return _buildEmployeeCard(_employees[index]);
-                    },
+                : RefreshIndicator(
+                    onRefresh: _loadEmployees,
+                    child: ListView.builder(
+                      itemCount: _employees.length,
+                      itemBuilder: (context, index) {
+                        return _buildEmployeeCard(_employees[index]);
+                      },
+                    ),
                   ),
           ),
         ],
@@ -599,6 +819,7 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showEmployeeDialog(),
         backgroundColor: Colors.orange,
+        tooltip: 'Agregar empleado',
         child: const Icon(Icons.add, color: Colors.white),
       ),
     );
